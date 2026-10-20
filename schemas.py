@@ -59,9 +59,12 @@ class TicketCreate(BaseModel):
     accesorios: Optional[str] = None
     estado_fisico: Optional[str] = None
 
+
+# --- ESQUEMAS DE TICKET (NUEVO FORMATO FÍSICO) ---
 class Ticket(BaseModel):
     id: int
     equipo_id: int
+    tecnico_id: Optional[int] = None  # <--- ESTA ES LA LLAVE MAESTRA
     fecha_entrada: datetime
     nombre_entrega: str
     nombre_recibe: str
@@ -71,16 +74,13 @@ class Ticket(BaseModel):
     accesorios: Optional[str] = None
     estado_fisico: Optional[str] = None
     
-    # --- LA CORRECCIÓN CLAVE ---
     tecnico_asignado: Optional[str] = None
     estatus: str
     ejecucion_servicio: Optional[str] = None
     requerimiento_refaccion: Optional[str] = None
     fecha_salida: Optional[datetime] = None
-
     class Config:
         from_attributes = True
-
 
 
 class TicketUpdate(BaseModel):

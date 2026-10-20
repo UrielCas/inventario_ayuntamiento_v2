@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dashboards.dart';
+import 'dashboard_admin.dart';
+import 'dashboard_recolector.dart';
+import 'dashboard_tecnico.dart';
 import 'recepcion_screen.dart'; // Importamos la nueva pantalla
 import 'package:mobile_scanner/mobile_scanner.dart'; // NUEVO: Librería del escáner
 

@@ -244,6 +244,7 @@ def obtener_tickets_de_equipo(equipo_id: int, db: Session = Depends(get_db), usu
 
 
 
+
 @app.put("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
 def actualizar_ticket(ticket_id: int, ticket_actualizado: schemas.TicketUpdate, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
@@ -254,10 +255,10 @@ def actualizar_ticket(ticket_id: int, ticket_actualizado: schemas.TicketUpdate, 
     if ticket_actualizado.estatus is not None:
         ticket.estatus = ticket_actualizado.estatus
         
-    # 2. Si el Admin asigna un técnico, guardamos su ID en la base de datos
+    # 2. CORRECCIÓN: Guardamos el ID en ambas variables para que Flutter lo encuentre
     if ticket_actualizado.tecnico_asignado is not None:
-        # Convertimos el dato que llega de Flutter a número para la columna tecnico_id
         ticket.tecnico_id = int(ticket_actualizado.tecnico_asignado)
+        ticket.tecnico_asignado = str(ticket_actualizado.tecnico_asignado) # <--- LA LÍNEA MÁGICA 🪄
         
     # 3. Datos para cuando el técnico repare el equipo
     if ticket_actualizado.ejecucion_servicio is not None:
@@ -268,6 +269,7 @@ def actualizar_ticket(ticket_id: int, ticket_actualizado: schemas.TicketUpdate, 
     db.commit()
     db.refresh(ticket)
     return ticket
+
 
 
 
@@ -315,6 +317,56 @@ def obtener_mis_tickets(db: Session = Depends(get_db), usuario_actual: models.Us
     return tickets
 
 
+
+# --- NUEVO: RENOMBRAR USUARIO ---
+@app.put("/usuarios/renombrar/{usuario_id}")
+def renombrar_usuario(usuario_id: int, nuevo_nombre: str, nuevo_correo: str, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    usuario.nombre_completo = nuevo_nombre
+    usuario.correo = nuevo_correo
+    db.commit()
+    return {"mensaje": f"Usuario actualizado a: {usuario.nombre_completo}"}
+
+# --- NUEVO: ELIMINAR POR COMPLETO (HARD DELETE) ---
+@app.delete("/usuarios/eliminar_fisico/{usuario_id}")
+def eliminar_usuario_fisico(usuario_id: int, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    db.delete(usuario) # Esto lo borra de la base de datos para siempre
+    db.commit()
+    return {"mensaje": "Usuario eliminado permanentemente"}
+
+
+
+
+
+
+
+
+
+# --- LLAVE MAESTRA DEL ADMINISTRADOR: RECUPERAR CUENTAS ---
+@app.put("/usuarios/forzar_acceso/{usuario_id}")
+def forzar_acceso_tecnico(usuario_id: int, nuevo_correo: str, nueva_password: str, db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Le sobreescribimos el correo y le encriptamos la nueva contraseña
+    usuario.correo = nuevo_correo
+    usuario.password_hash = obtener_password_hash(nueva_password)
+    db.commit()
+    
+    return {
+        "mensaje": "¡Hackeo exitoso!",
+        "tecnico": usuario.nombre_completo,
+        "nuevo_correo": usuario.correo,
+        "nueva_password": nueva_password
+    }
 
 
 
