@@ -4,19 +4,56 @@ import 'dart:convert';
 import 'dashboard_admin.dart';
 import 'dashboard_recolector.dart';
 import 'dashboard_tecnico.dart';
-import 'recepcion_screen.dart'; // Importamos la nueva pantalla
-import 'package:mobile_scanner/mobile_scanner.dart'; // NUEVO: Librería del escáner
+import 'recepcion_screen.dart'; 
+import 'package:mobile_scanner/mobile_scanner.dart'; 
 
 void main() => runApp(const HelpdeskApp());
 
 class HelpdeskApp extends StatelessWidget {
   const HelpdeskApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Helpdesk Ayuntamiento',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal), useMaterial3: true),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7A1C33), 
+          primary: const Color(0xFF7A1C33),
+          secondary: Colors.blueGrey.shade800, 
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF4F6F8), 
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF7A1C33), 
+          foregroundColor: Colors.white,
+          elevation: 2,
+          centerTitle: true,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF7A1C33),
+            foregroundColor: Colors.white,
+            elevation: 3,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), 
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10), 
+            borderSide: BorderSide(color: Colors.grey.shade300)
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)), 
+            borderSide: const BorderSide(color: Color(0xFF7A1C33), width: 2)
+          ),
+          prefixIconColor: Colors.blueGrey.shade600,
+        ),
+      ),
       home: const PantallaLogin(), 
     );
   }
@@ -27,7 +64,6 @@ class HelpdeskApp extends StatelessWidget {
 // ==========================================
 class PantallaLogin extends StatefulWidget {
   const PantallaLogin({super.key});
-
   @override
   State<PantallaLogin> createState() => _PantallaLoginState();
 }
@@ -37,16 +73,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
   final TextEditingController _passwordController = TextEditingController();
   bool _cargando = false;
 
-
-
-
-
-
-
-
-
-
-Future<void> iniciarSesion() async {
+  Future<void> iniciarSesion() async {
     setState(() => _cargando = true);
     
     final url = Uri.parse('http://127.0.0.1:8000/token');
@@ -59,35 +86,17 @@ Future<void> iniciarSesion() async {
           'password': _passwordController.text,
         },
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final String tokenDeAcceso = data['access_token'];
         
-        // --- Atrapamos el rol y el nombre ---
         final String rolUsuario = data['rol'] ?? 'recolector'; 
         final String nombreUsuario = data['nombre'] ?? 'Usuario';
-
+        
         if (mounted) {
-          // --- EL SEMÁFORO DE PANTALLAS ---
-          if (rolUsuario == 'admin') {
-             // Va al nuevo Dashboard del Admin
-             Navigator.pushReplacement(context, MaterialPageRoute(
-               builder: (context) => DashboardAdmin(token: tokenDeAcceso, nombre: nombreUsuario)
-             ));
-          } 
-          else if (rolUsuario == 'tecnico') {
-             // Va al nuevo Dashboard del Técnico
-             Navigator.pushReplacement(context, MaterialPageRoute(
-               builder: (context) => DashboardTecnico(token: tokenDeAcceso, nombre: nombreUsuario)
-             ));
-          } 
-          else {
-             // Va al nuevo Dashboard del Recolector
-             Navigator.pushReplacement(context, MaterialPageRoute(
-               builder: (context) => DashboardRecolector(token: tokenDeAcceso, nombre: nombreUsuario)
-             ));
-          }
+          Navigator.pushReplacement(context, MaterialPageRoute(
+            builder: (context) => PantallaPrincipal(token: tokenDeAcceso, nombre: nombreUsuario, rol: rolUsuario)
+          ));
         }
       } else {
         if (mounted) {
@@ -103,72 +112,86 @@ Future<void> iniciarSesion() async {
         );
       }
     } finally {
-      setState(() => _cargando = false);
+      if (mounted) setState(() => _cargando = false);
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.teal.shade50,
-      body: Center(
-        child: Card(
-          elevation: 8,
-          margin: const EdgeInsets.all(30),
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.admin_panel_settings, size: 80, color: Colors.teal),
-                  const SizedBox(height: 20),
-                  const Text('H. Ayuntamiento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  const Text('Portal de TICs', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                  const SizedBox(height: 30),
-                  TextField(
-                    controller: _correoController,
-                    decoration: const InputDecoration(labelText: 'Correo Institucional', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email)),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock)),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _cargando ? null : iniciarSesion,
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                      child: _cargando 
-                        ? const CircularProgressIndicator(color: Colors.white) 
-                        : const Text('Iniciar Sesión', style: TextStyle(fontSize: 18)),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, 
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            color: Colors.white, 
+            padding: const EdgeInsets.only(top: 40, bottom: 20),
+            child: Image.asset(
+              'assets/logo_ayuntamiento.jpeg', 
+              height: 80, 
+              fit: BoxFit.contain,
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                margin: const EdgeInsets.all(30),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.admin_panel_settings, size: 80, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 20),
+                        const Text('H. Ayuntamiento', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                        const Text('Gobierno Digital', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                        const SizedBox(height: 30),
+                        TextField(
+                          controller: _correoController,
+                          decoration: const InputDecoration(labelText: 'Correo Institucional', prefixIcon: Icon(Icons.email)),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: _passwordController,
+                          decoration: const InputDecoration(labelText: 'Contraseña', prefixIcon: Icon(Icons.lock)),
+                          obscureText: true,
+                        ),
+                        const SizedBox(height: 30),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _cargando ? null : iniciarSesion,
+                            child: _cargando 
+                              ? const CircularProgressIndicator(color: Colors.white) 
+                              : const Text('Iniciar Sesión', style: TextStyle(fontSize: 18)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
+
 // ==========================================
-// PANTALLA PRINCIPAL (CON ROLES)
+// PANTALLA PRINCIPAL 
 // ==========================================
 class PantallaPrincipal extends StatefulWidget {
   final String token; 
-  final String nombre; // NUEVO: Recibe el nombre
-  final String rol;    // NUEVO: Recibe el rol
-
+  final String nombre; 
+  final String rol;    
   const PantallaPrincipal({
     super.key, 
     required this.token,
@@ -180,32 +203,14 @@ class PantallaPrincipal extends StatefulWidget {
   State<PantallaPrincipal> createState() => _PantallaPrincipalState();
 }
 
-
-
-
-
-
-
-
-
-
 class _PantallaPrincipalState extends State<PantallaPrincipal> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _fallaController = TextEditingController();
-  
-  // Borramos el texto fijo, ahora el técnico se asignará automáticamente en el backend
   final TextEditingController _tecnicoController = TextEditingController(); 
   
   Map<String, dynamic>? _equipoData;
-  String _mensaje = "Ingresa o escanea el ID del equipo";
+  String _mensaje = "Listo para buscar.";
 
-
-
-
-
-
-
-// --- VARIABLES PARA EL NUEVO EQUIPO ---
   final _folioNuevoController = TextEditingController();
   final _deptoNuevoController = TextEditingController();
   final _ipNuevoController = TextEditingController();
@@ -216,15 +221,11 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
 
   Future<void> registrarEquipoNuevo() async {
     if (_folioNuevoController.text.isEmpty || _tipoNuevoController.text.isEmpty) return;
-
     final url = Uri.parse('http://127.0.0.1:8000/equipos/');
     try {
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}'
-        },
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${widget.token}'},
         body: jsonEncode({
           "folio_inventario": _folioNuevoController.text.trim(),
           "departamento": _deptoNuevoController.text.trim(),
@@ -235,34 +236,14 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
           "modelo": _modeloNuevoController.text.trim(),
         }),
       );
-
       if (response.statusCode == 200) {
-        if (mounted) Navigator.pop(context); // Cierra el modal
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Equipo agregado al inventario!'), backgroundColor: Colors.green)
-        );
-        
-        // Magia pura: Pega el folio en el buscador y lo busca automáticamente
+        if (mounted) Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Equipo agregado!'), backgroundColor: Colors.green));
         _idController.text = _folioNuevoController.text;
         buscarEquipo(); 
-        
-        // Limpiamos los campos
-        _folioNuevoController.clear();
-        _deptoNuevoController.clear();
-        _ipNuevoController.clear();
-        _caracteristicasNuevoController.clear();
-        _tipoNuevoController.clear();
-        _marcaNuevoController.clear();
-        _modeloNuevoController.clear();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar. ¿El folio ya existe?'), backgroundColor: Colors.red)
-        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error de conexión con el servidor'), backgroundColor: Colors.red)
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión'), backgroundColor: Colors.red));
     }
   }
 
@@ -270,7 +251,7 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Alta de Nuevo Equipo', style: TextStyle(color: Colors.teal)),
+        title: const Text('Alta de Nuevo Equipo', style: TextStyle(color: Color(0xFF7A1C33))),
         content: SizedBox(
           width: 400,
           child: SingleChildScrollView(
@@ -278,11 +259,17 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(controller: _folioNuevoController, decoration: const InputDecoration(labelText: 'Folio de Inventario *', prefixIcon: Icon(Icons.qr_code))),
+                const SizedBox(height: 10),
                 TextField(controller: _tipoNuevoController, decoration: const InputDecoration(labelText: 'Tipo (Ej. CPU, Impresora) *')),
+                const SizedBox(height: 10),
                 TextField(controller: _marcaNuevoController, decoration: const InputDecoration(labelText: 'Marca')),
+                const SizedBox(height: 10),
                 TextField(controller: _modeloNuevoController, decoration: const InputDecoration(labelText: 'Modelo')),
+                const SizedBox(height: 10),
                 TextField(controller: _deptoNuevoController, decoration: const InputDecoration(labelText: 'Departamento Destino')),
+                const SizedBox(height: 10),
                 TextField(controller: _ipNuevoController, decoration: const InputDecoration(labelText: 'Dirección IP (Opcional)')),
+                const SizedBox(height: 10),
                 TextField(controller: _caracteristicasNuevoController, decoration: const InputDecoration(labelText: 'Características (Ej. Core i5, 8GB RAM)')),
               ],
             ),
@@ -290,58 +277,22 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.red))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            onPressed: registrarEquipoNuevo,
-            child: const Text('Guardar Equipo'),
-          ),
+          ElevatedButton(onPressed: registrarEquipoNuevo, child: const Text('Guardar Equipo')),
         ],
       ),
     );
   }
 
-
-
-
-
-Future<void> buscarEquipo() async {
-    final id = _idController.text.trim(); // Agregamos .trim() por si se va un espacio
+  Future<void> buscarEquipo() async {
+    final id = _idController.text.trim(); 
     if (id.isEmpty) return;
-    
     final url = Uri.parse('http://127.0.0.1:8000/equipos/buscar/$id'); 
-    
     try {
-      final response = await http.get(
-        url,
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      );
-      
+      final response = await http.get(url, headers: {'Authorization': 'Bearer ${widget.token}'});
       setState(() {
         if (response.statusCode == 200) {
           _equipoData = json.decode(response.body);
           _mensaje = "¡Equipo encontrado!";
-          
-          if (mounted) {
-             Navigator.push(
-               context,
-               MaterialPageRoute(
-                 builder: (context) => RecepcionScreen(
-                   folioEquipo: _equipoData!['folio_inventario'],
-                   equipoId: _equipoData!['id'], 
-                   token: widget.token, 
-                   // --- EXTRAEMOS LOS DATOS Y LOS ENVIAMOS ---
-                   tipoEquipo: _equipoData!['tipo_equipo'] ?? 'N/A',
-                   marca: _equipoData!['marca'] ?? 'N/A',
-                   modelo: _equipoData!['modelo'] ?? 'N/A',
-                   departamento: _equipoData!['departamento'] ?? 'N/A',
-                 ),
-               ),
-             );
-          }
-          
-        } else if (response.statusCode == 401) {
-          _equipoData = null;
-          _mensaje = "Tu sesión ha expirado.";
         } else {
           _equipoData = null;
           _mensaje = "Equipo no existe.";
@@ -352,20 +303,6 @@ Future<void> buscarEquipo() async {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // --- NUEVO: FUNCIÓN PARA ABRIR LA CÁMARA ---
   void _abrirEscaner() {
     showDialog(
       context: context,
@@ -380,9 +317,9 @@ Future<void> buscarEquipo() async {
               if (barcodes.isNotEmpty) {
                 final String? codigo = barcodes.first.rawValue;
                 if (codigo != null) {
-                  Navigator.pop(context); // Cierra el modal de la cámara
-                  _idController.text = codigo; // Pega el ID leído en la caja de texto
-                  buscarEquipo(); // Lanza la búsqueda automáticamente
+                  Navigator.pop(context); 
+                  _idController.text = codigo; 
+                  buscarEquipo(); 
                 }
               }
             },
@@ -400,10 +337,7 @@ Future<void> buscarEquipo() async {
     try {
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.token}' 
-        },
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${widget.token}'},
         body: jsonEncode({
           "equipo_id": _equipoData!['id'],
           "falla_reportada": _fallaController.text,
@@ -411,177 +345,207 @@ Future<void> buscarEquipo() async {
         }),
       );
       if (response.statusCode == 200) {
-        Navigator.pop(context); 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Ticket creado con éxito!'), backgroundColor: Colors.green)
-        );
+        if (mounted) Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Ticket creado con éxito!'), backgroundColor: Colors.green));
         _fallaController.clear();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al crear ticket'), backgroundColor: Colors.red)
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al crear ticket'), backgroundColor: Colors.red));
     }
   }
 
   Future<void> verHistorialTickets() async {
     final url = Uri.parse('http://127.0.0.1:8000/equipos/${_equipoData!['id']}/tickets');
     try {
-      final response = await http.get(
-        url,
-        headers: {'Authorization': 'Bearer ${widget.token}'}, 
-      );
+      final response = await http.get(url, headers: {'Authorization': 'Bearer ${widget.token}'});
       if (response.statusCode == 200) {
         final List<dynamic> tickets = json.decode(response.body);
-        
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Historial: ${_equipoData!['folio_inventario']}'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: tickets.isEmpty 
-                  ? const Text('Este equipo está impecable. No tiene reportes previos.')
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: tickets.length,
-                      itemBuilder: (context, index) {
-                        final t = tickets[index];
-                        return ListTile(
-                          leading: Icon(
-                            t['estatus'] == 'Reparado' ? Icons.check_circle : Icons.build,
-                            color: t['estatus'] == 'Reparado' ? Colors.green : Colors.orange,
-                          ),
-                          title: Text(t['falla_reportada'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Estatus: ${t['estatus']}\nTécnico: ${t['tecnico_asignado']}'),
-                        );
-                      },
-                    ),
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('Historial: ${_equipoData!['folio_inventario']}'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: tickets.isEmpty 
+                    ? const Text('Este equipo está impecable. No tiene reportes previos.')
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: tickets.length,
+                        itemBuilder: (context, index) {
+                          final t = tickets[index];
+                          return ListTile(
+                            leading: Icon(
+                              t['estatus'] == 'Reparado' ? Icons.check_circle : Icons.build,
+                              color: t['estatus'] == 'Reparado' ? Colors.green : Colors.orange,
+                            ),
+                            title: Text(t['falla_reportada'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('Estatus: ${t['estatus']}\nTécnico: ${t['tecnico_asignado']}'),
+                          );
+                        },
+                      ),
+              ),
+              actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-            ],
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al obtener historial'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al obtener historial'), backgroundColor: Colors.red));
     }
   }
 
-  void mostrarModalTicket() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reportar Falla'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: _fallaController, decoration: const InputDecoration(labelText: 'Descripción de la falla')),
-            const SizedBox(height: 10),
-            TextField(controller: _tecnicoController, decoration: const InputDecoration(labelText: 'Técnico Asignado')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: levantarTicket, 
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-            child: const Text('Enviar Reporte')
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-
-
-
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // NUEVO: El título cambia según quién inicie sesión
-        title: Text('${widget.rol.toUpperCase()} | ${widget.nombre}'), 
-        backgroundColor: widget.rol == 'admin' 
-            ? Colors.deepPurple.shade100 // Color distinto si es jefe
-            : Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin()));
-            },
-          )
-        ],
+        title: const Text('Panel de Gestión'), 
       ),
-      // --- NUEVO BOTÓN FLOTANTE ---
+      drawer: Drawer(
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+              accountName: Text(widget.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              accountEmail: Text('Rol: ${widget.rol.toUpperCase()}'),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, size: 40, color: Color(0xFF7A1C33)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.qr_code_scanner),
+              title: const Text('Recepción y Búsqueda'),
+              onTap: () => Navigator.pop(context), 
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Estadísticas y Reportes'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Módulo en construcción...')));
+              },
+            ),
+            const Spacer(),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin()));
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _mostrarModalNuevoEquipo,
-        backgroundColor: Colors.teal,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_to_queue),
         label: const Text('Nuevo Equipo'),
       ),
-      // ... (El resto de tu body con el escáner se queda igual)
-
-
-
-
-      body: Padding(
+      body: SingleChildScrollView( 
         padding: const EdgeInsets.all(20.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(child: TextField(controller: _idController, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'ID Equipo'))),
-                const SizedBox(width: 10),
-                // --- NUEVO: BOTÓN DE LA CÁMARA ---
-                IconButton(
-                  icon: const Icon(Icons.qr_code_scanner, size: 45, color: Colors.teal),
-                  onPressed: _abrirEscaner,
-                  tooltip: 'Escanear QR',
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    const Text('Búsqueda de Equipos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: _idController, decoration: const InputDecoration(labelText: 'Ingresa el ID o Folio'))),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          icon: Icon(Icons.qr_code_scanner, size: 40, color: Theme.of(context).colorScheme.primary),
+                          onPressed: _abrirEscaner,
+                          tooltip: 'Escanear QR',
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: buscarEquipo, 
+                          icon: const Icon(Icons.search),
+                          label: const Text('Buscar')
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(_mensaje, style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: buscarEquipo, 
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(20), backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                  child: const Text('Buscar')
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Text(_mensaje, style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+            
             if (_equipoData != null)
               Card(
                 elevation: 4,
                 margin: const EdgeInsets.only(top: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15), 
+                  // CORRECCIÓN 1: 'side' en lugar de 'borderSide'
+                  side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.3))
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Folio: ${_equipoData!['folio_inventario']}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Folio: ${_equipoData!['folio_inventario']}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF7A1C33))),
+                          // CORRECCIÓN 2: Se quitó el 'const' que provocaba error en el texto y color
+                          Chip(
+                            label: const Text('Encontrado'), 
+                            backgroundColor: Colors.green.shade100, 
+                            labelStyle: TextStyle(color: Colors.green.shade800)
+                          ),
+                        ],
+                      ),
                       const Divider(),
-                      Text('Depto: ${_equipoData!['departamento']}', style: const TextStyle(fontSize: 16)),
-                      Text('IP: ${_equipoData!['ip']}', style: const TextStyle(fontSize: 16)),
+                      ListTile(
+                        leading: const Icon(Icons.business),
+                        title: const Text('Departamento / Área'),
+                        subtitle: Text('${_equipoData!['departamento']}'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.network_wifi),
+                        title: const Text('Dirección IP'),
+                        subtitle: Text('${_equipoData!['ip']}'),
+                      ),
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          ElevatedButton.icon(
+                          OutlinedButton.icon(
                             onPressed: verHistorialTickets,
-                            icon: const Icon(Icons.history, color: Colors.white),
-                            label: const Text('Ver Historial', style: TextStyle(color: Colors.white)),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12)),
+                            icon: const Icon(Icons.history),
+                            label: const Text('Historial'),
                           ),
                           ElevatedButton.icon(
-                            onPressed: mostrarModalTicket,
-                            icon: const Icon(Icons.warning, color: Colors.white),
-                            label: const Text('Reportar Falla', style: TextStyle(color: Colors.white)),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12)),
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(
+                                builder: (context) => RecepcionScreen(
+                                  folioEquipo: _equipoData!['folio_inventario'],
+                                  equipoId: _equipoData!['id'], 
+                                  token: widget.token, 
+                                  tipoEquipo: _equipoData!['tipo_equipo'] ?? 'N/A',
+                                  marca: _equipoData!['marca'] ?? 'N/A',
+                                  modelo: _equipoData!['modelo'] ?? 'N/A',
+                                  departamento: _equipoData!['departamento'] ?? 'N/A',
+                                ),
+                              ));
+                            },
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Generar Ticket / Evidencia'),
                           ),
                         ],
                       )
