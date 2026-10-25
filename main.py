@@ -49,7 +49,7 @@ app.add_middleware(
 
 SECRET_KEY = "ayuntamiento_secreto_super_seguro" 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -307,11 +307,17 @@ def crear_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), us
 
 
 
-
-
 @app.get("/equipos/{equipo_id}/tickets", response_model=list[schemas.TicketResponse])
 def obtener_tickets_de_equipo(equipo_id: int, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     tickets = db.query(models.Ticket).filter(models.Ticket.equipo_id == equipo_id).all()
+    
+    # === TRADUCTOR PARA EL HISTORIAL: Convertir el ID del técnico a su Nombre real ===
+    for t in tickets:
+        if t.tecnico_id:
+            tecnico = db.query(models.Usuario).filter(models.Usuario.id == t.tecnico_id).first()
+            if tecnico:
+                t.tecnico_asignado = tecnico.nombre_completo
+                
     return tickets
 
 
@@ -325,6 +331,13 @@ from pydantic import BaseModel
 class AsignacionTecnico(BaseModel):
     nombre_tecnico: str
 
+
+
+
+
+
+
+
 @app.put("/tickets/{ticket_id}/asignar")
 def asignar_tecnico(ticket_id: int, asignacion: AsignacionTecnico, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     
@@ -334,9 +347,15 @@ def asignar_tecnico(ticket_id: int, asignacion: AsignacionTecnico, db: Session =
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket no encontrado")
         
-    # 2. Actualizamos los datos
+    # === LA PIEZA FALTANTE: Buscamos al técnico para obtener su ID real ===
+    tecnico = db.query(models.Usuario).filter(models.Usuario.nombre_completo == asignacion.nombre_tecnico).first()
+    if not tecnico:
+        raise HTTPException(status_code=404, detail="El técnico seleccionado no existe")
+        
+    # 2. Actualizamos los datos (Guardamos tanto el NOMBRE como el ID)
     ticket.tecnico_asignado = asignacion.nombre_tecnico
-    ticket.estatus = "En Reparación" # Esto mueve el ticket a la siguiente fase
+    ticket.tecnico_id = tecnico.id # <--- Con esto, el ticket ya le pertenece oficialmente a Alex
+    ticket.estatus = "En Reparación" 
     
     # 3. Guardamos los cambios
     db.commit()
@@ -391,15 +410,39 @@ def buscar_equipo_por_folio(folio: str, db: Session = Depends(get_db), usuario_a
 
 
 
+
+
+
+
+
+
+
+
 # ==========================================
 # RUTAS PARA EL PANEL DEL ADMINISTRADOR
 # ==========================================        
-
 @app.get("/tickets/todos", response_model=list[schemas.TicketResponse])
 def obtener_todos_los_tickets(db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     # Traemos todos los tickets ordenados del más reciente al más viejo
     tickets = db.query(models.Ticket).order_by(models.Ticket.id.desc()).all()
+    
+    # === TRADUCTOR PARA EL ADMIN: Convertir el ID del técnico a su Nombre real ===
+    for t in tickets:
+        if t.tecnico_id:
+            tecnico = db.query(models.Usuario).filter(models.Usuario.id == t.tecnico_id).first()
+            if tecnico:
+                t.tecnico_asignado = tecnico.nombre_completo
+                
     return tickets
+
+
+
+
+
+
+
+
+
 
 @app.get("/usuarios/tecnicos")
 def obtener_tecnicos(db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
@@ -408,6 +451,13 @@ def obtener_tecnicos(db: Session = Depends(get_db), usuario_actual: models.Usuar
     
     # Devolvemos solo su ID y su nombre para llenar el menú desplegable en Flutter
     return [{"id": t.id, "nombre": t.nombre_completo} for t in tecnicos]
+
+
+
+
+
+
+
 
 
 
@@ -491,6 +541,24 @@ def forzar_acceso_tecnico(usuario_id: int, nuevo_correo: str, nueva_password: st
         "nuevo_correo": usuario.correo,
         "nueva_password": nueva_password
     }
+
+
+
+
+
+
+
+
+
+# --- NUEVO: LISTAR TODOS LOS USUARIOS ---
+@app.get("/usuarios/", response_model=list[schemas.UsuarioResponse])
+def obtener_todos_los_usuarios(db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
+    # Solo los administradores deberían poder ver esta lista por seguridad
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="No tienes permisos para ver el personal")
+    
+    usuarios = db.query(models.Usuario).all()
+    return usuarios
 
 
 
