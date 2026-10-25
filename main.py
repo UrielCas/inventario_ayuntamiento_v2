@@ -7,19 +7,37 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+from typing import Optional
 from jose import JWTError, jwt
+
+import shutil
+from fastapi import File, UploadFile, Form
+
 
 from database import engine, Base, SessionLocal
 import models
 import schemas
 
+
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Esto obliga a Python a crear la carpeta automáticamente si se te olvida
+os.makedirs("fotos_equipos", exist_ok=True)
+
 Base.metadata.create_all(bind=engine)
 
+# 1. PRIMERO creamos la aplicación
 app = FastAPI(
     title="API Helpdesk Ayuntamiento",
     description="Sistema de gestión de inventario, tickets y usuarios",
     version="1.0.0"
 )
+
+# 2. DESPUÉS montamos la carpeta usando la variable "app" que ya existe
+app.mount("/fotos", StaticFiles(directory="fotos_equipos"), name="fotos")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -162,16 +180,62 @@ def ruta_principal():
     return {"mensaje": "¡El cerebro del Helpdesk está vivo y asegurado!"}
 
 
+
+
+
+
 # ==========================================
 # RUTAS PROTEGIDAS (AQUÍ EXIGIMOS EL TOKEN)
 # ==========================================
+
+
 @app.post("/equipos/", response_model=schemas.EquipoResponse)
-def registrar_equipo(equipo: schemas.EquipoCreate, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
-    nuevo_equipo = models.Equipo(**equipo.model_dump())
+def registrar_equipo(
+    folio_inventario: str = Form(...),
+    departamento: str = Form(...),
+    ip: str = Form(...),
+    caracteristicas: str = Form(...),
+    tipo_equipo: str = Form(...),
+    marca: str = Form(...),
+    modelo: str = Form(...),
+    foto: Optional[UploadFile] = File(None), # <--- Sintaxis a prueba de fallos
+    db: Session = Depends(get_db), 
+    usuario_actual: models.Usuario = Depends(obtener_usuario_actual)
+):
+    ruta_imagen = None
+    
+    if foto and foto.filename:
+        extension = foto.filename.split(".")[-1]
+        nombre_archivo = f"{folio_inventario}.{extension}"
+        ruta_completa = f"fotos_equipos/{nombre_archivo}"
+        
+        with open(ruta_completa, "wb") as buffer:
+            shutil.copyfileobj(foto.file, buffer)
+        
+        ruta_imagen = f"/fotos/{nombre_archivo}"
+
+    nuevo_equipo = models.Equipo(
+        folio_inventario=folio_inventario,
+        departamento=departamento,
+        ip=ip,
+        caracteristicas=caracteristicas,
+        tipo_equipo=tipo_equipo,
+        marca=marca,
+        modelo=modelo,
+        ruta_foto=ruta_imagen
+    )
+    
     db.add(nuevo_equipo)
     db.commit()
     db.refresh(nuevo_equipo)
     return nuevo_equipo
+
+
+
+
+
+
+
 
 @app.get("/equipos/{equipo_id}", response_model=schemas.EquipoResponse)
 def obtener_equipo(equipo_id: int, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
@@ -192,9 +256,6 @@ def obtener_equipo(equipo_id: int, db: Session = Depends(get_db), usuario_actual
 
 
 
-
-
-
 @app.post("/tickets/", response_model=schemas.Ticket)
 def crear_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     
@@ -202,13 +263,27 @@ def crear_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), us
     equipo = db.query(models.Equipo).filter(models.Equipo.id == ticket.equipo_id).first()
     if not equipo:
         raise HTTPException(status_code=404, detail="Equipo no encontrado")
+        
+    # === EL NUEVO CANDADO ANTI-DUPLICADOS ===
+    # Buscamos si el equipo ya tiene un ticket que NO esté Resuelto/Entregado
+    ticket_activo = db.query(models.Ticket).filter(
+        models.Ticket.equipo_id == ticket.equipo_id,
+        models.Ticket.estatus.notin_(["Resuelto", "Entregado"]) # Ajusta estas palabras según los estados que uses
+    ).first()
     
+    if ticket_activo:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Este equipo ya está en el taller (Ticket #{ticket_activo.id} en estado: {ticket_activo.estatus})"
+        )
+    # ==========================================
+
     # 2. Creamos el ticket dejando huella de quién lo recibió en el sistema
     nuevo_ticket = models.Ticket(
         equipo_id=ticket.equipo_id,
-        recolector_id=usuario_actual.id,  # <--- Registramos quién inició sesión
+        recolector_id=usuario_actual.id,
         nombre_entrega=ticket.nombre_entrega,
-        nombre_recibe=usuario_actual.nombre_completo, # <--- Se pone su nombre automáticamente
+        nombre_recibe=usuario_actual.nombre_completo,
         telefono=ticket.telefono,
         departamento=ticket.departamento,
         diagnostico_inicial=ticket.diagnostico_inicial,
@@ -232,12 +307,42 @@ def crear_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db), us
 
 
 
+
+
 @app.get("/equipos/{equipo_id}/tickets", response_model=list[schemas.TicketResponse])
 def obtener_tickets_de_equipo(equipo_id: int, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
     tickets = db.query(models.Ticket).filter(models.Ticket.equipo_id == equipo_id).all()
     return tickets
 
 
+
+
+
+
+from pydantic import BaseModel
+
+# Creamos un esquema rápido para recibir el nombre del técnico
+class AsignacionTecnico(BaseModel):
+    nombre_tecnico: str
+
+@app.put("/tickets/{ticket_id}/asignar")
+def asignar_tecnico(ticket_id: int, asignacion: AsignacionTecnico, db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
+    
+    # 1. Buscamos el ticket en la base de datos
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+    
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+        
+    # 2. Actualizamos los datos
+    ticket.tecnico_asignado = asignacion.nombre_tecnico
+    ticket.estatus = "En Reparación" # Esto mueve el ticket a la siguiente fase
+    
+    # 3. Guardamos los cambios
+    db.commit()
+    db.refresh(ticket)
+    
+    return {"mensaje": "Asignación exitosa", "ticket_id": ticket.id, "tecnico": ticket.tecnico_asignado}
 
 
 
@@ -343,7 +448,26 @@ def eliminar_usuario_fisico(usuario_id: int, db: Session = Depends(get_db)):
 
 
 
-
+@app.get("/estadisticas/")
+def obtener_estadisticas_globales(db: Session = Depends(get_db), usuario_actual: models.Usuario = Depends(obtener_usuario_actual)):
+    # Contamos absolutamente todos los equipos en el inventario
+    total_equipos = db.query(models.Equipo).count()
+    
+    # Contamos los tickets que siguen activos (cualquier estado que no sea cerrado)
+    tickets_abiertos = db.query(models.Ticket).filter(
+        models.Ticket.estatus.notin_(["Resuelto", "Entregado"])
+    ).count()
+    
+    # Contamos los tickets que ya se terminaron exitosamente
+    tickets_resueltos = db.query(models.Ticket).filter(
+        models.Ticket.estatus.in_(["Resuelto", "Entregado"])
+    ).count()
+    
+    return {
+        "total_equipos": total_equipos,
+        "tickets_abiertos": tickets_abiertos,
+        "tickets_resueltos": tickets_resueltos
+    }
 
 
 

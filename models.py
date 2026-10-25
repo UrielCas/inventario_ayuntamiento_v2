@@ -32,6 +32,9 @@ class Equipo(Base):
     
     tickets = relationship("Ticket", back_populates="equipo")
 
+    ruta_foto = Column(String, nullable=True)
+
+
 
 # --- TABLA: TICKETS (ÓRDENES DE REPARACIÓN) ---
 class Ticket(Base):

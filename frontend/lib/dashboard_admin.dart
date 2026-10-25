@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:async'; // Para el temporizador automático
-import 'main.dart'; // Para regresar al login
-import 'pdf_generator.dart'; // Para generar la orden de salida
+import 'dart:async'; 
+import 'main.dart'; 
+import 'pdf_generator.dart'; 
 
 // ==========================================
 // DASHBOARD DEL ADMIN (PANEL DE CONTROL Y ESTADÍSTICAS)
@@ -13,6 +13,7 @@ class DashboardAdmin extends StatefulWidget {
   final String token;
   final String nombre;
   const DashboardAdmin({Key? key, required this.token, required this.nombre}) : super(key: key);
+
   @override
   State<DashboardAdmin> createState() => _DashboardAdminState();
 }
@@ -22,13 +23,12 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   List<dynamic> _tecnicos = [];
   bool _cargando = true;
   Timer? _temporizador; 
-  int _indiceNavegacion = 0; // Controla qué pestaña estamos viendo
+  int _indiceNavegacion = 0; 
 
   @override
   void initState() {
     super.initState();
     cargarDatos();
-    // Recarga invisible cada 60 segundos
     _temporizador = Timer.periodic(const Duration(minutes: 1), (timer) {
       cargarDatos();
     });
@@ -36,7 +36,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
 
   @override
   void dispose() {
-    _temporizador?.cancel(); // Apagamos el reloj al salir
+    _temporizador?.cancel();
     super.dispose();
   }
 
@@ -45,8 +45,10 @@ class _DashboardAdminState extends State<DashboardAdmin> {
       final urlTickets = Uri.parse('http://127.0.0.1:8000/tickets/todos');
       final urlTecnicos = Uri.parse('http://127.0.0.1:8000/usuarios/tecnicos');
       final headers = {'Authorization': 'Bearer ${widget.token}'};
+
       final respTickets = await http.get(urlTickets, headers: headers);
       final respTecnicos = await http.get(urlTecnicos, headers: headers);
+
       if (respTickets.statusCode == 200 && respTecnicos.statusCode == 200) {
         if (mounted) {
           setState(() {
@@ -61,22 +63,23 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     }
   }
 
-  Future<void> asignarTecnico(int ticketId, String tecnicoIdStr) async {
-    final url = Uri.parse('http://127.0.0.1:8000/tickets/$ticketId');
+  Future<void> asignarTecnico(int ticketId, String nombreTecnico) async {
+    final url = Uri.parse('http://127.0.0.1:8000/tickets/$ticketId/asignar');
     try {
       final response = await http.put(
         url,
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${widget.token}'},
-        body: jsonEncode({"estatus": "Asignado", "tecnico_asignado": tecnicoIdStr}),
+        body: jsonEncode({"nombre_tecnico": nombreTecnico}),
       );
+
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnico asignado exitosamente'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnico asignado y ticket en reparación'), backgroundColor: Colors.green));
         cargarDatos(); 
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al asignar'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al asignar: ${response.body}'), backgroundColor: Colors.red));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión con el servidor'), backgroundColor: Colors.red));
     }
   }
 
@@ -89,8 +92,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al cargar datos del equipo'), backgroundColor: Colors.red));
         return;
       }
-      final equipo = json.decode(respEquipo.body);
 
+      final equipo = json.decode(respEquipo.body);
       final urlTicket = Uri.parse('http://127.0.0.1:8000/tickets/${ticket['id']}');
       final response = await http.put(
         urlTicket,
@@ -138,7 +141,12 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Selecciona un Técnico', border: OutlineInputBorder()),
                   value: tecnicoSeleccionado,
-                  items: _tecnicos.map((t) { return DropdownMenuItem<String>(value: t['id'].toString(), child: Text(t['nombre'])); }).toList(),
+                  items: _tecnicos.map((t) { 
+                    return DropdownMenuItem<String>(
+                      value: t['nombre'], 
+                      child: Text(t['nombre'])
+                    ); 
+                  }).toList(),
                   onChanged: (val) => setModalState(() => tecnicoSeleccionado = val),
                 ),
               ],
@@ -147,7 +155,10 @@ class _DashboardAdminState extends State<DashboardAdmin> {
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.red))),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple, foregroundColor: Colors.white),
-                onPressed: tecnicoSeleccionado == null ? null : () { Navigator.pop(context); asignarTecnico(ticketId, tecnicoSeleccionado!); },
+                onPressed: tecnicoSeleccionado == null ? null : () { 
+                  Navigator.pop(context); 
+                  asignarTecnico(ticketId, tecnicoSeleccionado!); 
+                },
                 child: const Text('Asignar Trabajo'),
               ),
             ],
@@ -161,10 +172,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
 
 
 
-// ==========================================
-  // VISTA 1: LA LISTA DE TICKETS (VERSIÓN FINAL COMPLETA)
-  // ==========================================
-  Widget _construirListaTickets() {
+
+Widget _construirListaTickets() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -176,23 +185,14 @@ class _DashboardAdminState extends State<DashboardAdmin> {
             itemBuilder: (context, index) {
               final t = _tickets[index];
               
-              // --- BUSCAMOS AL TÉCNICO USANDO EL ID REAL ---
               String nombreTecnico = "";
-              // Atrapamos el ID ya sea que llegue como tecnico_id o tecnico_asignado
-              String idEncontrado = t['tecnico_id']?.toString() ?? t['tecnico_asignado']?.toString() ?? "";
-              
-              if (idEncontrado.isNotEmpty && idEncontrado != "null") {
-                var tecnico = _tecnicos.firstWhere(
-                  (tec) => tec['id'].toString() == idEncontrado, 
-                  orElse: () => {'nombre': 'Desconocido'}
-                );
-                nombreTecnico = "\nTécnico: ${tecnico['nombre']}";
+              if (t['tecnico_asignado'] != null && t['tecnico_asignado'].toString().isNotEmpty) {
+                nombreTecnico = "\nTécnico: ${t['tecnico_asignado']}";
               }
 
-              // --- VARIABLES DE CONTROL ---
               final bool esNuevo = t['estatus'] == 'Recibido';
               final bool esReparado = t['estatus'] == 'Reparado';
-              final bool puedeReasignar = ['Asignado', 'En Diagnóstico', 'Espera de Piezas'].contains(t['estatus']);
+              final bool puedeReasignar = ['Asignado', 'En Diagnóstico', 'Espera de Piezas', 'En Reparación'].contains(t['estatus']);
 
               return Card(
                 elevation: esNuevo ? 4 : 1, margin: const EdgeInsets.only(bottom: 15),
@@ -204,8 +204,6 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                   ),
                   title: Text('Ticket #${t['id']} - Depto: ${t['departamento']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('Falla: ${t['diagnostico_inicial']}\nEstatus: ${t['estatus']}$nombreTecnico'),
-                  
-                  // --- LÓGICA DEL BOTÓN REASIGNAR ---
                   trailing: esNuevo || puedeReasignar
                       ? ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
@@ -222,7 +220,11 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                               icon: const Icon(Icons.check_circle, size: 18), label: const Text('Entregar Equipo'),
                               onPressed: () => entregarEquipo(t),
                             )
-                          : Chip(label: Text(t['estatus'], style: const TextStyle(color: Colors.white)), backgroundColor: Colors.blueGrey),
+                          // === CHIP DE ESTATUS CORREGIDO ===
+                          : Chip(
+                              label: Text(t['estatus'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), 
+                              backgroundColor: t['estatus'] == 'Entregado' ? Colors.green : Colors.blueGrey,
+                            ),
                 ),
               );
             },
@@ -232,17 +234,13 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
-
-  // ==========================================
-  // VISTA 2: EL PANEL DE ESTADÍSTICAS 
-  // ==========================================
+  
   Widget _construirEstadisticas() {
     int total = _tickets.length;
     int nuevos = _tickets.where((t) => t['estatus'] == 'Recibido').length;
-    int enProceso = _tickets.where((t) => ['Asignado', 'En Diagnóstico', 'Espera de Piezas'].contains(t['estatus'])).length;
+    int enProceso = _tickets.where((t) => ['Asignado', 'En Reparación', 'En Diagnóstico', 'Espera de Piezas'].contains(t['estatus'])).length;
     int terminados = _tickets.where((t) => ['Reparado', 'Entregado', 'Baja Definitiva'].contains(t['estatus'])).length;
 
-    // 1. Cálculos de Departamentos
     Map<String, int> fallasPorDepto = {};
     for (var t in _tickets) {
       String depto = t['departamento'] ?? 'Desconocido';
@@ -250,18 +248,11 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     }
     var deptosOrdenados = fallasPorDepto.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-    // 2. CORRECCIÓN: Cálculos de Carga por Técnico
-    Map<String, String> mapaTecnicos = {};
-    for (var tec in _tecnicos) {
-      mapaTecnicos[tec['id'].toString()] = tec['nombre'];
-    }
-
     Map<String, int> cargaPorTecnico = {};
     int totalAsignados = 0;
     for (var t in _tickets) {
-      // Usamos 'tecnico_asignado' tal como viene de FastAPI
       if (t['tecnico_asignado'] != null && t['tecnico_asignado'].toString().isNotEmpty) { 
-        String nombreTecnico = mapaTecnicos[t['tecnico_asignado'].toString()] ?? 'Desconocido';
+        String nombreTecnico = t['tecnico_asignado'];
         cargaPorTecnico[nombreTecnico] = (cargaPorTecnico[nombreTecnico] ?? 0) + 1;
         totalAsignados++;
       }
@@ -274,7 +265,6 @@ class _DashboardAdminState extends State<DashboardAdmin> {
         children: [
           const Text('Resumen General del Taller', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
           const SizedBox(height: 20),
-          
           Row(
             children: [
               _crearTarjetaEstadistica('Total Tickets', total.toString(), Icons.confirmation_number, Colors.blue),
@@ -288,7 +278,6 @@ class _DashboardAdminState extends State<DashboardAdmin> {
             ],
           ),
           const SizedBox(height: 30),
-
           const Text('Carga de Trabajo por Técnico', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
           Card(
@@ -318,7 +307,6 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                   ),
           ),
           const SizedBox(height: 30),
-
           const Text('Top Departamentos con más Reportes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
           Card(
@@ -350,9 +338,6 @@ class _DashboardAdminState extends State<DashboardAdmin> {
       ),
     );
   }
-
-
-
 
   Widget _crearTarjetaEstadistica(String titulo, String valor, IconData icono, Color color) {
     return Expanded(

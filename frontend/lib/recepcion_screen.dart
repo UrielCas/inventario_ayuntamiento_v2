@@ -61,7 +61,9 @@ class _RecepcionScreenState extends State<RecepcionScreen> {
     }
   }
 
-  Future<void> registrarIngreso() async {
+
+
+Future<void> registrarIngreso() async {
     if (_nombreEntregaController.text.isEmpty || _diagnosticoController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor llena el Nombre y el Diagnóstico'), backgroundColor: Colors.orange)
@@ -110,10 +112,28 @@ class _RecepcionScreenState extends State<RecepcionScreen> {
           quienRecibe: "RECOLECTOR EN TURNO", 
         );
         if (mounted) Navigator.pop(context); 
+        
       } else {
+        // === NUEVO LECTOR DE ERRORES EXACTOS ===
         if (mounted) {
+          String mensajeError = 'Error desconocido al guardar';
+          try {
+            // Intentamos leer el JSON que manda FastAPI
+            final decoded = jsonDecode(response.body);
+            if (decoded['detail'] != null) {
+              mensajeError = decoded['detail']; // Extraemos el mensaje personalizado
+            }
+          } catch (_) {
+            // Si no es un JSON, mostramos el texto crudo
+            mensajeError = 'Error ${response.statusCode}: ${response.body}';
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al guardar los datos'), backgroundColor: Colors.red)
+            SnackBar(
+              content: Text(mensajeError, style: const TextStyle(fontSize: 16)), 
+              backgroundColor: Colors.red.shade800,
+              duration: const Duration(seconds: 6), // Le damos tiempo al usuario para leerlo
+            )
           );
         }
       }
@@ -121,7 +141,7 @@ class _RecepcionScreenState extends State<RecepcionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Fallo en el servidor: $e'), 
+            content: Text('Fallo en la conexión: $e'), 
             backgroundColor: Colors.red, 
             duration: const Duration(seconds: 6)
           )
@@ -131,6 +151,13 @@ class _RecepcionScreenState extends State<RecepcionScreen> {
       if (mounted) setState(() => _guardando = false);
     }
   }
+
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {

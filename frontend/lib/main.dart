@@ -5,6 +5,10 @@ import 'dashboard_admin.dart';
 import 'dashboard_recolector.dart';
 import 'dashboard_tecnico.dart';
 import 'recepcion_screen.dart'; 
+import 'estadisticas_screen.dart'; // <-- Aquí está el import que faltaba
+
+import 'package:image_picker/image_picker.dart';
+
 import 'package:mobile_scanner/mobile_scanner.dart'; 
 
 void main() => runApp(const HelpdeskApp());
@@ -199,9 +203,30 @@ class PantallaPrincipal extends StatefulWidget {
     required this.rol,
   });
   
+
+
+
+
+
+
+
+
+
+
+
+
   @override
   State<PantallaPrincipal> createState() => _PantallaPrincipalState();
+
+
+
 }
+
+
+
+
+
+
 
 class _PantallaPrincipalState extends State<PantallaPrincipal> {
   final TextEditingController _idController = TextEditingController();
@@ -219,69 +244,168 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
   final _marcaNuevoController = TextEditingController();
   final _modeloNuevoController = TextEditingController();
 
-  Future<void> registrarEquipoNuevo() async {
-    if (_folioNuevoController.text.isEmpty || _tipoNuevoController.text.isEmpty) return;
-    final url = Uri.parse('http://127.0.0.1:8000/equipos/');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ${widget.token}'},
-        body: jsonEncode({
-          "folio_inventario": _folioNuevoController.text.trim(),
-          "departamento": _deptoNuevoController.text.trim(),
-          "ip": _ipNuevoController.text.trim().isEmpty ? "DHCP / No asignada" : _ipNuevoController.text.trim(),
-          "caracteristicas": _caracteristicasNuevoController.text.trim(),
-          "tipo_equipo": _tipoNuevoController.text.trim(),
-          "marca": _marcaNuevoController.text.trim(),
-          "modelo": _modeloNuevoController.text.trim(),
-        }),
-      );
-      if (response.statusCode == 200) {
-        if (mounted) Navigator.pop(context); 
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Equipo agregado!'), backgroundColor: Colors.green));
-        _idController.text = _folioNuevoController.text;
-        buscarEquipo(); 
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión'), backgroundColor: Colors.red));
+
+XFile? _fotoSeleccionada;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _tomarFoto() async {
+    // Abrimos la cámara del dispositivo
+    final XFile? foto = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+    if (foto != null) {
+      setState(() {
+        _fotoSeleccionada = foto;
+      });
     }
   }
 
-  void _mostrarModalNuevoEquipo() {
+
+
+Future<void> registrarEquipoNuevo() async {
+    if (_folioNuevoController.text.isEmpty || _tipoNuevoController.text.isEmpty) return;
+    
+    final url = Uri.parse('http://127.0.0.1:8000/equipos/');
+    
+    try {
+      var request = http.MultipartRequest('POST', url);
+      request.headers['Authorization'] = 'Bearer ${widget.token}';
+
+      // Aseguramos que se envíen todos los campos como los pide FastAPI
+      request.fields['folio_inventario'] = _folioNuevoController.text.trim();
+      request.fields['departamento'] = _deptoNuevoController.text.trim();
+      request.fields['ip'] = _ipNuevoController.text.trim().isEmpty ? "DHCP / No asignada" : _ipNuevoController.text.trim();
+      request.fields['caracteristicas'] = _caracteristicasNuevoController.text.trim();
+      request.fields['tipo_equipo'] = _tipoNuevoController.text.trim();
+      request.fields['marca'] = _marcaNuevoController.text.trim();
+      request.fields['modelo'] = _modeloNuevoController.text.trim();
+
+      if (_fotoSeleccionada != null) {
+        final bytes = await _fotoSeleccionada!.readAsBytes();
+        // Le forzamos un nombre por defecto en caso de que la web no genere uno
+        final fileName = _fotoSeleccionada!.name.isNotEmpty ? _fotoSeleccionada!.name : 'foto.jpg';
+        
+        request.files.add(http.MultipartFile.fromBytes(
+          'foto', 
+          bytes, 
+          filename: fileName
+        ));
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        if (mounted) Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Equipo agregado con éxito!'), backgroundColor: Colors.green));
+        _idController.text = _folioNuevoController.text;
+        _fotoSeleccionada = null; 
+        buscarEquipo(); 
+      } else {
+        // === NUEVO: SI FALLA, QUE NOS MUESTRE EL TEXTO EXACTO DE FASTAPI ===
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error ${response.statusCode}: ${response.body}'), 
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5), // Dura más para que podamos leerlo
+          )
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión con el servidor'), backgroundColor: Colors.red));
+    }
+  }
+
+
+
+
+
+
+
+
+void _mostrarModalNuevoEquipo() {
+    // Limpiamos la memoria por si había una foto de un registro anterior
+    _fotoSeleccionada = null; 
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Alta de Nuevo Equipo', style: TextStyle(color: Color(0xFF7A1C33))),
-        content: SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: _folioNuevoController, decoration: const InputDecoration(labelText: 'Folio de Inventario *', prefixIcon: Icon(Icons.qr_code))),
-                const SizedBox(height: 10),
-                TextField(controller: _tipoNuevoController, decoration: const InputDecoration(labelText: 'Tipo (Ej. CPU, Impresora) *')),
-                const SizedBox(height: 10),
-                TextField(controller: _marcaNuevoController, decoration: const InputDecoration(labelText: 'Marca')),
-                const SizedBox(height: 10),
-                TextField(controller: _modeloNuevoController, decoration: const InputDecoration(labelText: 'Modelo')),
-                const SizedBox(height: 10),
-                TextField(controller: _deptoNuevoController, decoration: const InputDecoration(labelText: 'Departamento Destino')),
-                const SizedBox(height: 10),
-                TextField(controller: _ipNuevoController, decoration: const InputDecoration(labelText: 'Dirección IP (Opcional)')),
-                const SizedBox(height: 10),
-                TextField(controller: _caracteristicasNuevoController, decoration: const InputDecoration(labelText: 'Características (Ej. Core i5, 8GB RAM)')),
-              ],
+      builder: (context) => StatefulBuilder( 
+        builder: (context, setStateModal) {
+          return AlertDialog(
+            title: const Text('Alta de Nuevo Equipo', style: TextStyle(color: Color(0xFF7A1C33))),
+            content: SizedBox(
+              width: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: _folioNuevoController, decoration: const InputDecoration(labelText: 'Folio de Inventario *', prefixIcon: Icon(Icons.qr_code))),
+                    const SizedBox(height: 10),
+                    TextField(controller: _tipoNuevoController, decoration: const InputDecoration(labelText: 'Tipo (Ej. CPU, Impresora) *')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _marcaNuevoController, decoration: const InputDecoration(labelText: 'Marca')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _modeloNuevoController, decoration: const InputDecoration(labelText: 'Modelo')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _deptoNuevoController, decoration: const InputDecoration(labelText: 'Departamento Destino')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _ipNuevoController, decoration: const InputDecoration(labelText: 'Dirección IP (Opcional)')),
+                    const SizedBox(height: 10),
+                    TextField(controller: _caracteristicasNuevoController, decoration: const InputDecoration(labelText: 'Características (Ej. Core i5, 8GB RAM)')),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // === NUEVO: VISTA PREVIA DE LA FOTO ===
+                    if (_fotoSeleccionada != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 15.0),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            _fotoSeleccionada!.path, 
+                            height: 150, 
+                            width: double.infinity, 
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final XFile? foto = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                        if (foto != null) {
+                          setStateModal(() { 
+                            _fotoSeleccionada = foto;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(_fotoSeleccionada == null ? 'Tomar Foto del Equipo' : 'Cambiar Foto'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _fotoSeleccionada == null ? Colors.blueGrey : Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.red))),
-          ElevatedButton(onPressed: registrarEquipoNuevo, child: const Text('Guardar Equipo')),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Colors.red))),
+              ElevatedButton(
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardando...'), duration: Duration(seconds: 1)));
+                  await registrarEquipoNuevo();
+                }, 
+                child: const Text('Guardar Equipo')
+              ),
+            ],
+          );
+        }
       ),
     );
   }
+
+
+
+
 
   Future<void> buscarEquipo() async {
     final id = _idController.text.trim(); 
@@ -395,12 +519,28 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
     }
   }
 
-  @override
+
+
+
+
+
+
+
+
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Panel de Gestión'), 
       ),
+
+
+
+
+
+
+
+
       drawer: Drawer(
         child: Column(
           children: [
@@ -418,20 +558,55 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
               title: const Text('Recepción y Búsqueda'),
               onTap: () => Navigator.pop(context), 
             ),
-            ListTile(
-              leading: const Icon(Icons.dashboard),
-              title: const Text('Estadísticas y Reportes'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Módulo en construcción...')));
-              },
-            ),
-            const Spacer(),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              onTap: () {
+
+// === BOTÓN NUEVO: PANEL DEL ADMINISTRADOR ===
+            if (widget.rol == 'admin')
+              ListTile(
+                leading: const Icon(Icons.manage_accounts),
+                title: const Text('Panel Administrativo'),
+                onTap: () {
+                  Navigator.pop(context); 
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => DashboardAdmin(token: widget.token, nombre: widget.nombre),                  ));
+                },
+              ),
+
+            
+            // === CANDADO 1: Solo el 'admin' puede ver el botón de Estadísticas ===
+                  if (widget.rol == 'admin')
+                    ListTile(
+                      leading: const Icon(Icons.dashboard),
+                      title: const Text('Estadísticas y Reportes'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => EstadisticasScreen(token: widget.token),
+                  ));
+                },
+              ),
+              
+
+// === BOTÓN EXCLUSIVO PARA EL TÉCNICO ===
+            if (widget.rol == 'tecnico')
+              ListTile(
+                leading: const Icon(Icons.handyman),
+                title: const Text('Mi Taller (Tickets)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(
+                    // Le pasamos el token y su nombre para que el dashboard sepa quién es
+                    builder: (context) => DashboardTecnico(token: widget.token, nombre: widget.nombre),
+                  ));
+                },
+              ),
+
+
+               const Spacer(),
+                const Divider(),
+                ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                onTap: () {
                 Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin()));
               },
             ),
@@ -439,13 +614,21 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _mostrarModalNuevoEquipo,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_to_queue),
-        label: const Text('Nuevo Equipo'),
-      ),
+      
+
+
+
+      // === CANDADO 2: Si el rol es 'tecnico', ocultamos el botón de Nuevo Equipo ===
+      floatingActionButton: widget.rol == 'tecnico' 
+        ? null 
+        : FloatingActionButton.extended(
+            onPressed: _mostrarModalNuevoEquipo,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_to_queue),
+            label: const Text('Nuevo Equipo'),
+          ),
+          
       body: SingleChildScrollView( 
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -484,13 +667,15 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
               ),
             ),
             
-            if (_equipoData != null)
+
+
+
+if (_equipoData != null)
               Card(
                 elevation: 4,
                 margin: const EdgeInsets.only(top: 20),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15), 
-                  // CORRECCIÓN 1: 'side' en lugar de 'borderSide'
                   side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.3))
                 ),
                 child: Padding(
@@ -502,7 +687,6 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Folio: ${_equipoData!['folio_inventario']}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF7A1C33))),
-                          // CORRECCIÓN 2: Se quitó el 'const' que provocaba error en el texto y color
                           Chip(
                             label: const Text('Encontrado'), 
                             backgroundColor: Colors.green.shade100, 
@@ -511,6 +695,35 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                         ],
                       ),
                       const Divider(),
+                      
+
+
+
+
+// === LA FOTO DEL EQUIPO ===
+                      if (_equipoData!['ruta_foto'] != null)
+                        Center( // Centramos la imagen en la tarjeta
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 15.0),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(15), // Bordes redondeados
+                              child: Image.network(
+                                'http://127.0.0.1:8000${_equipoData!['ruta_foto']}', 
+                                height: 180, // Alto fijo
+                                width: 180,  // Ancho fijo (cuadrado mediano)
+                                fit: BoxFit.cover, // Recorta los bordes sin deformar la foto
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  height: 180,
+                                  width: 180,
+                                  color: Colors.grey.shade200,
+                                  child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+
                       ListTile(
                         leading: const Icon(Icons.business),
                         title: const Text('Departamento / Área'),
@@ -553,9 +766,13 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                   ),
                 ),
               )
+
+
           ],
+
+
         ),
       ),
     );
   }
-}
+} // <-- 

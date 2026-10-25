@@ -35,6 +35,7 @@ class EquipoBase(BaseModel):
     tipo_equipo: Optional[str] = None
     marca: Optional[str] = None
     modelo: Optional[str] = None
+    ruta_foto: Optional[str] = None # <--- EL ESLABÓN PERDIDO
 
 class EquipoCreate(EquipoBase):
     pass

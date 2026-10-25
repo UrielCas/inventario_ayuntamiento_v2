@@ -7,6 +7,8 @@ import 'main.dart'; // Para regresar al login
 // ==========================================
 // DASHBOARD DEL TÉCNICO (EL TALLER)
 // ==========================================
+
+
 class DashboardTecnico extends StatefulWidget {
   final String token;
   final String nombre;
@@ -25,14 +27,27 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
     cargarMisTickets();
   }
 
-  Future<void> cargarMisTickets() async {
+
+
+
+
+
+
+
+
+
+
+
+Future<void> cargarMisTickets() async {
     try {
       final url = Uri.parse('http://127.0.0.1:8000/tickets/mis-asignaciones');
       final response = await http.get(url, headers: {'Authorization': 'Bearer ${widget.token}'});
       if (response.statusCode == 200) {
         if(mounted) {
           setState(() {
-            _misTickets = json.decode(response.body);
+            List<dynamic> ticketsDescargados = json.decode(response.body);
+            // El filtro mágico: Solo conservamos los que NO digan "Entregado"
+            _misTickets = ticketsDescargados.where((t) => t['estatus'] != 'Entregado').toList();
             _cargando = false;
           });
         }
@@ -41,6 +56,14 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
       if(mounted) setState(() => _cargando = false);
     }
   }
+
+
+
+
+
+
+
+
 
   Future<void> actualizarTrabajo(int ticketId, String nuevoEstatus, String trabajo, String piezas) async {
     final url = Uri.parse('http://127.0.0.1:8000/tickets/$ticketId');
@@ -70,8 +93,7 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
     String estatusSeleccionado = ticket['estatus'];
     final _trabajoController = TextEditingController(text: ticket['ejecucion_servicio'] ?? '');
     final _piezasController = TextEditingController(text: ticket['requerimiento_refaccion'] ?? '');
-    final List<String> opcionesEstatus = ["Asignado", "En Diagnóstico", "Espera de Piezas", "Reparado", "Baja Definitiva"];
-    
+    final List<String> opcionesEstatus = ["En Reparación", "En Diagnóstico", "Espera de Piezas", "Reparado", "Baja Definitiva"];    
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -90,7 +112,11 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
                     
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Cambiar Estatus', border: OutlineInputBorder()),
-                      value: opcionesEstatus.contains(estatusSeleccionado) ? estatusSeleccionado : "Asignado",
+
+
+                     value: opcionesEstatus.contains(estatusSeleccionado) ? estatusSeleccionado : "En Reparación",
+
+
                       items: opcionesEstatus.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                       onChanged: (val) => setModalState(() => estatusSeleccionado = val!),
                     ),
