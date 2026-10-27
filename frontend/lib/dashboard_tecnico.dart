@@ -1,6 +1,7 @@
 // Autor: URIEL GUTIÉRREZ CASTILLO
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'main.dart';
 import 'dart:convert';
 import 'dart:async'; // <-- IMPORTANTE PARA EL RELOJ AUTOMÁTICO
 import 'pantalla_login.dart'; 
@@ -89,6 +90,8 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
     final _piezasController = TextEditingController(text: ticket['requerimiento_refaccion'] ?? '');
     final List<String> opcionesEstatus = ["En Reparación", "En Diagnóstico", "Espera de Piezas", "Reparado", "Baja Definitiva"];    
 
+
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -143,13 +146,42 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorFondo, 
-      appBar: AppBar(
+
+
+
+appBar: AppBar(
         title: Text('Taller | ${widget.nombre}'), 
         backgroundColor: colorPrincipal, 
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          
+          // === AQUÍ PEGAS EL NUEVO BOTÓN ANIMADO ===
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, mode, child) {
+              return IconButton(
+                tooltip: 'Cambiar Tema',
+                onPressed: () {
+                  themeNotifier.value = mode == ThemeMode.light 
+                      ? ThemeMode.dark 
+                      : ThemeMode.light;
+                },
+                icon: AnimatedRotation(
+                  turns: mode == ThemeMode.light ? 0.0 : 0.5, 
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOutBack, 
+                  child: Image.asset(
+                    'assets/dia-y-noche.png',
+                    width: 26,
+                    height: 26,
+                    color: Colors.white, 
+                  ),
+                ),
+              );
+            }
+          ),
+
           // === BOTÓN MANUAL DE RECARGA ===
           IconButton(
             icon: const Icon(Icons.refresh), 
@@ -162,6 +194,10 @@ class _DashboardTecnicoState extends State<DashboardTecnico> {
           IconButton(icon: const Icon(Icons.logout), onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin())))
         ]
       ),
+
+
+
+
       body: _cargando 
           ? const Center(child: CircularProgressIndicator(color: colorAcento))
           : Padding(

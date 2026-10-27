@@ -37,7 +37,10 @@ class _PantallaLoginState extends State<PantallaLogin> {
     setState(() => _cargando = true);
 
     try {
-      final url = Uri.parse('http://127.0.0.1:8000/token');
+    
+    
+    
+      final url = Uri.parse('https://2bbbf2bad08053.lhr.life/token');
       // FastAPI OAuth2 espera datos de formulario (x-www-form-urlencoded), NO un JSON
       final response = await http.post(
         url,
@@ -83,14 +86,14 @@ class _PantallaLoginState extends State<PantallaLogin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorFondo,
+
       body: Center(
         child: SingleChildScrollView(
           child: Container(
             width: 400, // Ancho fijo para que se vea como una tarjeta elegante en PC
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(
-              color: Colors.white,
+                  color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, spreadRadius: 5),

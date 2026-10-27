@@ -2,11 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'main.dart';
+
 import 'dart:async'; 
 import 'package:mobile_scanner/mobile_scanner.dart'; // PARA EL ESCÁNER QR
 import 'recepcion_screen.dart'; // PARA CREAR TICKET DESDE LA BÚSQUEDA
 import 'pantalla_login.dart'; 
 import 'pdf_generator.dart'; 
+
+
 
 // ==========================================
 // PALETA DE COLORES (ESTÉTICA AZUL PIZARRA)
@@ -460,6 +464,9 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                     children: [
                       Expanded(child: TextField(controller: _idController, decoration: const InputDecoration(labelText: 'Ingresa el ID o Folio', border: OutlineInputBorder()))),
                       const SizedBox(width: 10),
+
+
+
                       IconButton(
                         icon: const Icon(Icons.qr_code_scanner, size: 40, color: colorAcento),
                         onPressed: _abrirEscaner,
@@ -770,16 +777,50 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
+
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: colorFondo, 
-      appBar: AppBar(
+
+
+appBar: AppBar(
         title: Text('Panel de Control | ${widget.nombre}'), 
         backgroundColor: colorPrincipal, 
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          
+          // === AQUÍ PEGASTE EL NUEVO BOTÓN ANIMADO ===
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, mode, child) {
+              return IconButton(
+                tooltip: 'Cambiar Tema',
+                onPressed: () {
+                  themeNotifier.value = mode == ThemeMode.light 
+                      ? ThemeMode.dark 
+                      : ThemeMode.light;
+                },
+                icon: AnimatedRotation(
+                  turns: mode == ThemeMode.light ? 0.0 : 0.5, 
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOutBack, 
+                  child: Image.asset(
+                    'assets/dia-y-noche.png',
+                    width: 26,
+                    height: 26,
+                    color: Colors.white, 
+                  ),
+                ),
+              );
+            }
+          ),
+
+          // LOS BOTONES QUE YA TENÍAS SE QUEDAN IGUAL
           IconButton(
             icon: const Icon(Icons.refresh), 
             tooltip: 'Actualizar ahora',
@@ -791,6 +832,11 @@ class _DashboardAdminState extends State<DashboardAdmin> {
           IconButton(icon: const Icon(Icons.logout), onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin())))
         ]
       ),
+
+
+
+
+
       body: _cargando 
           ? const Center(child: CircularProgressIndicator(color: colorAcento))
           : Padding(
@@ -802,12 +848,16 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                       ? _construirBusqueda() 
                       : (_indiceNavegacion == 2 ? _construirEstadisticas() : _construirGestionPersonal())),
             ),
+
+
+
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _indiceNavegacion,
         type: BottomNavigationBarType.fixed, // Asegura que los íconos no se muevan raro al tener más de 3
         selectedItemColor: colorAcento,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 10,
         onTap: (index) {
           setState(() {

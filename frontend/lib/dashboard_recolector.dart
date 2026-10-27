@@ -6,12 +6,12 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart'; 
 import 'recepcion_screen.dart';
 import 'pantalla_login.dart';
+import 'main.dart'; // Para el interruptor maestro de Modo Oscuro
 
 // ==========================================
-// PALETA DE COLORES (ESTÉTICA AZUL PIZARRA)
+// PALETA DE COLORES
 // ==========================================
 const Color colorPrincipal = Color(0xFF475569); 
-const Color colorFondo = Color(0xFFF8FAFC); 
 const Color colorAcento = Color(0xFF3B82F6); 
 
 class DashboardRecolector extends StatefulWidget {
@@ -37,11 +37,14 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
   XFile? _fotoSeleccionada;
   final ImagePicker _picker = ImagePicker();
 
+  // === MAGIA DE RED: Detecta la IP real de la computadora host ===
+ String get apiUrl => 'https://2bbbf2bad08053.lhr.life';
+
   Future<void> buscarEquipo() async {
     final id = _idController.text.trim();
     if (id.isEmpty) return;
     
-    final url = Uri.parse('http://127.0.0.1:8000/equipos/buscar/$id'); 
+    final url = Uri.parse('$apiUrl/equipos/buscar/$id'); 
     
     try {
       final response = await http.get(url, headers: {'Authorization': 'Bearer ${widget.token}'});
@@ -76,7 +79,7 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
         }
       });
     } catch (e) {
-      setState(() { _mensaje = "Error de conexión."; });
+      setState(() { _mensaje = "Error de conexión con el servidor."; });
     }
   }
 
@@ -84,7 +87,7 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Escanea la etiqueta del equipo', textAlign: TextAlign.center, style: TextStyle(color: colorPrincipal, fontWeight: FontWeight.bold)),
+        title: const Text('Escanea el QR', textAlign: TextAlign.center, style: TextStyle(color: colorPrincipal, fontWeight: FontWeight.bold)),
         content: SizedBox(
           width: 300, height: 300,
           child: MobileScanner(
@@ -108,7 +111,7 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
 
   Future<void> registrarEquipoNuevo() async {
     if (_folioNuevoController.text.isEmpty || _tipoNuevoController.text.isEmpty) return;
-    final url = Uri.parse('http://127.0.0.1:8000/equipos/');
+    final url = Uri.parse('$apiUrl/equipos/');
     try {
       var request = http.MultipartRequest('POST', url);
       request.headers['Authorization'] = 'Bearer ${widget.token}';
@@ -150,19 +153,23 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
 
   void _mostrarModalNuevoEquipo() {
     _fotoSeleccionada = null; 
+    // Variable para detectar si es celular (pantalla pequeña)
+    bool esMovil = MediaQuery.of(context).size.width < 600;
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder( 
         builder: (context, setStateModal) {
           return AlertDialog(
-            title: const Text('Alta de Nuevo Equipo', style: TextStyle(color: colorPrincipal, fontWeight: FontWeight.bold)),
+            title: const Text('Nuevo Equipo', style: TextStyle(color: colorPrincipal, fontWeight: FontWeight.bold)),
+            insetPadding: esMovil ? const EdgeInsets.all(10) : const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
             content: SizedBox(
-              width: 400,
+              width: esMovil ? double.maxFinite : 400, // Ajuste automático de ancho
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(controller: _folioNuevoController, decoration: const InputDecoration(labelText: 'Folio de Inventario *', prefixIcon: Icon(Icons.qr_code, color: colorPrincipal))),
+                    TextField(controller: _folioNuevoController, decoration: const InputDecoration(labelText: 'Folio *', prefixIcon: Icon(Icons.qr_code, color: colorPrincipal))),
                     const SizedBox(height: 10),
                     TextField(controller: _tipoNuevoController, decoration: const InputDecoration(labelText: 'Tipo (Ej. CPU) *')),
                     const SizedBox(height: 10),
@@ -170,9 +177,9 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
                     const SizedBox(height: 10),
                     TextField(controller: _modeloNuevoController, decoration: const InputDecoration(labelText: 'Modelo')),
                     const SizedBox(height: 10),
-                    TextField(controller: _deptoNuevoController, decoration: const InputDecoration(labelText: 'Departamento Destino')),
+                    TextField(controller: _deptoNuevoController, decoration: const InputDecoration(labelText: 'Depto. Destino')),
                     const SizedBox(height: 10),
-                    TextField(controller: _ipNuevoController, decoration: const InputDecoration(labelText: 'Dirección IP (Opcional)')),
+                    TextField(controller: _ipNuevoController, decoration: const InputDecoration(labelText: 'IP (Opcional)')),
                     const SizedBox(height: 10),
                     TextField(controller: _caracteristicasNuevoController, decoration: const InputDecoration(labelText: 'Características')),
                     
@@ -182,25 +189,18 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
                         padding: const EdgeInsets.only(bottom: 15.0),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            _fotoSeleccionada!.path, 
-                            height: 150, 
-                            width: double.infinity, 
-                            fit: BoxFit.cover,
-                          ),
+                          child: Image.network(_fotoSeleccionada!.path, height: 150, width: double.infinity, fit: BoxFit.cover),
                         ),
                       ),
                     ElevatedButton.icon(
                       onPressed: () async {
                         final XFile? foto = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
                         if (foto != null) {
-                          setStateModal(() { 
-                            _fotoSeleccionada = foto;
-                          });
+                          setStateModal(() => _fotoSeleccionada = foto);
                         }
                       },
                       icon: const Icon(Icons.camera_alt),
-                      label: Text(_fotoSeleccionada == null ? 'Tomar Foto del Equipo' : 'Cambiar Foto'),
+                      label: Text(_fotoSeleccionada == null ? 'Tomar Foto' : 'Cambiar Foto'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _fotoSeleccionada == null ? colorPrincipal : Colors.green,
                         foregroundColor: Colors.white,
@@ -218,7 +218,7 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardando...'), duration: Duration(seconds: 1)));
                   await registrarEquipoNuevo();
                 },
-                child: const Text('Guardar Equipo'),
+                child: const Text('Guardar'),
               ),
             ],
           );
@@ -229,21 +229,38 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
 
   @override
   Widget build(BuildContext context) {
+    // === DETECTOR DE PANTALLA ===
+    bool esMovil = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
-      backgroundColor: colorFondo,
       appBar: AppBar(
-        title: Text('Recepción | ${widget.nombre}'), 
+        title: Text(esMovil ? 'Recepción' : 'Recepción | ${widget.nombre}'), 
         backgroundColor: colorPrincipal, 
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // === BOTÓN MANUAL DE RECARGA (LIMPIEZA) ===
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, mode, child) {
+              return IconButton(
+                tooltip: 'Cambiar Tema',
+                onPressed: () {
+                  themeNotifier.value = mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+                },
+                icon: AnimatedRotation(
+                  turns: mode == ThemeMode.light ? 0.0 : 0.5, 
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOutBack, 
+                  child: Image.asset('assets/dia-y-noche.png', width: 26, height: 26, color: Colors.white),
+                ),
+              );
+            }
+          ),
           IconButton(
             icon: const Icon(Icons.refresh), 
-            tooltip: 'Limpiar búsqueda',
             onPressed: () {
               _idController.clear();
-              setState(() => _mensaje = "Ingresa o escanea el ID del equipo para registrar su entrada.");
+              setState(() => _mensaje = "Ingresa o escanea el ID del equipo.");
             }
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaLogin())))
@@ -254,49 +271,52 @@ class _DashboardRecolectorState extends State<DashboardRecolector> {
         backgroundColor: colorAcento, 
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_to_queue), 
-        label: const Text('Registrar Equipo Nuevo'),
+        label: Text(esMovil ? 'Nuevo' : 'Registrar Equipo Nuevo'), // Más corto en celular
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            const Icon(Icons.inventory, size: 80, color: colorPrincipal),
-            const SizedBox(height: 20),
-            const Text('Módulo de Recepción', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: colorPrincipal)),
-            Text('Escanea o teclea el folio para recibir un equipo en el taller.', style: TextStyle(color: Colors.grey.shade600)),
-            const SizedBox(height: 30),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _idController, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Folio del Equipo', prefixIcon: Icon(Icons.search, color: colorPrincipal)))),
-                        const SizedBox(width: 10),
-                        IconButton(icon: const Icon(Icons.qr_code_scanner, size: 45, color: colorAcento), onPressed: _abrirEscaner, tooltip: 'Escanear QR'),
-                        const SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: buscarEquipo, 
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.all(20), 
-                            backgroundColor: colorAcento, 
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                          ), 
-                          child: const Text('Buscar')
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(_mensaje, style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic, fontSize: 16)),
-                  ],
+        padding: EdgeInsets.all(esMovil ? 10.0 : 20.0), // Menos margen en celular
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Icon(Icons.inventory, size: esMovil ? 50 : 80, color: colorPrincipal),
+              const SizedBox(height: 10),
+              Text('Módulo de Recepción', style: TextStyle(fontSize: esMovil ? 20 : 24, fontWeight: FontWeight.bold, color: colorPrincipal)),
+              Text('Escanea o teclea el folio.', style: TextStyle(color: Colors.grey.shade600), textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                child: Padding(
+                  padding: EdgeInsets.all(esMovil ? 10.0 : 20.0),
+                  child: Column(
+                    children: [
+                      // La fila se adapta: En celular los botones son más compactos
+                      Row(
+                        children: [
+                          Expanded(child: TextField(controller: _idController, decoration: InputDecoration(border: const OutlineInputBorder(), labelText: 'Folio', prefixIcon: esMovil ? null : const Icon(Icons.search, color: colorPrincipal)))),
+                          const SizedBox(width: 5),
+                          IconButton(icon: const Icon(Icons.qr_code_scanner, size: 35, color: colorAcento), onPressed: _abrirEscaner),
+                          const SizedBox(width: 5),
+                          ElevatedButton(
+                            onPressed: buscarEquipo, 
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.all(esMovil ? 15 : 20), 
+                              backgroundColor: colorAcento, 
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                            ), 
+                            child: esMovil ? const Icon(Icons.search) : const Text('Buscar') // En celular solo muestra lupa
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(_mensaje, style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic, fontSize: esMovil ? 14 : 16)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
